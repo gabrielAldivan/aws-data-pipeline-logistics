@@ -136,8 +136,12 @@ def main():
     print(f"Generating {args.rows:,} freight trip records (seed={args.seed})...")
     df = generate(n_rows=args.rows, seed=args.seed)
 
-    # Split into monthly files to simulate partitioned landing zone
-    df["_month"] = pd.to_datetime(df["departure_time"]).dt.to_period("M").astype(str)
+    # Split into monthly files to simulate partitioned landing zone.
+    # Guard against invalid/NaT dates that would yield an empty "month=" partition
+    # (Spark rejects empty partition column values).
+    parsed = pd.to_datetime(df["departure_time"], errors="coerce")
+    df["_month"] = parsed.dt.to_period("M").astype(str)
+    df = df[df["_month"].str.fullmatch(r"\d{4}-\d{2}")].copy()
     for month, group in df.groupby("_month"):
         out_df = group.drop(columns=["_month"])
         if args.output_dir.startswith("s3://"):
