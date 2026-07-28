@@ -8,8 +8,8 @@
 
 data "archive_file" "lambda_trigger" {
   type        = "zip"
-  source_file = "${path.module}/../lambda/trigger_pipeline.py"
-  output_path = "${path.module}/../lambda/trigger_pipeline.zip"
+  source_file = "${path.module}/../lambda_/trigger_pipeline.py"
+  output_path = "${path.module}/../lambda_/trigger_pipeline.zip"
 }
 
 resource "aws_lambda_function" "trigger" {

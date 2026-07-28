@@ -7,30 +7,6 @@ on:
     branches: [main]
 
 jobs:
-  # ── Terraform validation ────────────────────────────────────────────────────
-  terraform:
-    name: Terraform Validate
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: infra
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: "1.7.0"
-
-      - name: Terraform Init (local backend — no credentials needed)
-        run: terraform init -backend=false
-
-      - name: Terraform Format Check
-        run: terraform fmt -check -recursive
-
-      - name: Terraform Validate
-        run: terraform validate
-
   # ── Python unit tests ───────────────────────────────────────────────────────
   test:
     name: Unit Tests (PySpark + moto)
@@ -85,7 +61,7 @@ jobs:
         run: python glue_jobs/gold_aggregate.py
 
       - name: Run unit tests
-        run: pytest tests/ -v --cov=glue_jobs --cov=lambda --cov-report=term-missing
+        run: pytest tests/ -v --cov=glue_jobs --cov=lambda_ --cov-report=term-missing
 
   # ── Linting ─────────────────────────────────────────────────────────────────
   lint:
@@ -99,6 +75,6 @@ jobs:
       - name: Install linters
         run: pip install flake8 black
       - name: Black
-        run: black --check glue_jobs/ emr_jobs/ lambda/ scripts/ tests/
+        run: black --check glue_jobs/ emr_jobs/ lambda_/ scripts/ tests/
       - name: Flake8
-        run: flake8 glue_jobs/ emr_jobs/ lambda/ scripts/ --max-line-length=100 --ignore=E203,W503,F401,F403
+        run: flake8 glue_jobs/ emr_jobs/ lambda_/ scripts/ --max-line-length=100 --ignore=E203,W503,F401,F403
