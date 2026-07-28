@@ -56,6 +56,7 @@ def make_silver_df(spark, n: int = 100):
         rows.append(
             {
                 "trip_id": f"TRIP-{i:04d}",
+                "train_id": f"TRAIN-{random.randint(1, 50):03d}",
                 "origin_station": random.choice(stations),
                 "destination_station": random.choice(stations),
                 "cargo_type": random.choice(cargo_types),
@@ -185,6 +186,7 @@ class TestSilverTransformations:
         rows = [
             {
                 "trip_id": "OK-1",
+                "cargo_type": "GRAIN",
                 "cargo_weight_tons": 1000.0,
                 "freight_value_brl": 50000.0,
                 "delay_minutes": 0,
@@ -193,6 +195,7 @@ class TestSilverTransformations:
             },
             {
                 "trip_id": "BAD-1",
+                "cargo_type": "FUEL",
                 "cargo_weight_tons": -1.0,
                 "freight_value_brl": 50000.0,
                 "delay_minutes": 0,
