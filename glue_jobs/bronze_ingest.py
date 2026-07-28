@@ -11,6 +11,7 @@ Responsibilities:
 Runs on: AWS Glue 4.0 (Spark 3.3 + Python 3)
 Local test: python glue_jobs/bronze_ingest.py (mock args via env vars)
 """
+
 import sys
 import os
 import uuid
@@ -24,12 +25,15 @@ try:
     from awsglue.job import Job
     from pyspark.context import SparkContext
 
-    args = getResolvedOptions(sys.argv, [
-        "JOB_NAME",
-        "RAW_BUCKET",
-        "BRONZE_BUCKET",
-        "GLUE_DATABASE",
-    ])
+    args = getResolvedOptions(
+        sys.argv,
+        [
+            "JOB_NAME",
+            "RAW_BUCKET",
+            "BRONZE_BUCKET",
+            "GLUE_DATABASE",
+        ],
+    )
     sc = SparkContext()
     glueContext = GlueContext(sc)
     spark = glueContext.spark_session
@@ -41,10 +45,15 @@ except ImportError:
     # Local development — fall back to plain PySpark
     IS_GLUE = False
     from pyspark.sql import SparkSession
-    spark = SparkSession.builder.appName("BronzeIngest-local").master("local[*]").getOrCreate()
+
+    spark = (
+        SparkSession.builder.appName("BronzeIngest-local")
+        .master("local[*]")
+        .getOrCreate()
+    )
     spark.sparkContext.setLogLevel("WARN")
     args = {
-        "RAW_BUCKET":    os.environ.get("RAW_BUCKET", "local"),
+        "RAW_BUCKET": os.environ.get("RAW_BUCKET", "local"),
         "BRONZE_BUCKET": os.environ.get("BRONZE_BUCKET", "local"),
         "GLUE_DATABASE": os.environ.get("GLUE_DATABASE", "logistics_db"),
     }
@@ -52,15 +61,26 @@ except ImportError:
 from pyspark.sql import functions as F  # noqa: E402
 
 # ── Config ────────────────────────────────────────────────────────────────────
-RAW_PATH    = f"s3://{args['RAW_BUCKET']}/freight/" if IS_GLUE else "data/raw/"
-BRONZE_PATH = f"s3://{args['BRONZE_BUCKET']}/freight/" if IS_GLUE else "data/bronze/freight/"
-RUN_ID      = str(uuid.uuid4())
+RAW_PATH = f"s3://{args['RAW_BUCKET']}/freight/" if IS_GLUE else "data/raw/"
+BRONZE_PATH = (
+    f"s3://{args['BRONZE_BUCKET']}/freight/" if IS_GLUE else "data/bronze/freight/"
+)
+RUN_ID = str(uuid.uuid4())
 INGESTION_TS = datetime.now(timezone.utc).isoformat()
 
 EXPECTED_COLUMNS = [
-    "trip_id", "origin_station", "destination_station", "cargo_type",
-    "cargo_weight_tons", "departure_time", "arrival_time", "train_id",
-    "operator", "freight_value_brl", "fuel_cost_brl", "delay_minutes",
+    "trip_id",
+    "origin_station",
+    "destination_station",
+    "cargo_type",
+    "cargo_weight_tons",
+    "departure_time",
+    "arrival_time",
+    "train_id",
+    "operator",
+    "freight_value_brl",
+    "fuel_cost_brl",
+    "delay_minutes",
 ]
 
 
@@ -75,8 +95,7 @@ def validate_schema(df):
 def add_metadata(df):
     """Add pipeline lineage columns — Bronze is the source of truth for traceability."""
     return (
-        df
-        .withColumn("_ingestion_timestamp", F.lit(INGESTION_TS))
+        df.withColumn("_ingestion_timestamp", F.lit(INGESTION_TS))
         .withColumn("_pipeline_run_id", F.lit(RUN_ID))
         .withColumn("_source_path", F.input_file_name())
         .withColumn("_ingestion_date", F.current_date())
@@ -86,8 +105,7 @@ def add_metadata(df):
 def run():
     print(f"[BRONZE] Reading raw CSVs from: {RAW_PATH}")
     df = (
-        spark.read
-        .option("header", "true")
+        spark.read.option("header", "true")
         .option("inferSchema", "true")
         .option("multiLine", "true")
         .option("escape", '"')
@@ -102,8 +120,7 @@ def run():
 
     print(f"[BRONZE] Writing to: {BRONZE_PATH}")
     (
-        df.write
-        .mode("append")                        # append — Bronze is immutable/additive
+        df.write.mode("append")  # append — Bronze is immutable/additive
         .partitionBy("_ingestion_date")
         .parquet(BRONZE_PATH)
     )

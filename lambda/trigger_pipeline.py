@@ -10,6 +10,7 @@ Handles:
   - Idempotency: deduplicates by S3 ETag to avoid double-processing
   - DLQ-friendly: exceptions propagate so Lambda retries work correctly
 """
+
 import json
 import os
 import logging
@@ -20,11 +21,11 @@ from urllib.parse import unquote_plus
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
-sfn    = boto3.client("stepfunctions")
-s3     = boto3.client("s3")
+sfn = boto3.client("stepfunctions")
+s3 = boto3.client("s3")
 
 STATE_MACHINE_ARN = os.environ["STATE_MACHINE_ARN"]
-ENVIRONMENT       = os.environ.get("ENVIRONMENT", "dev")
+ENVIRONMENT = os.environ.get("ENVIRONMENT", "dev")
 
 
 def _build_execution_name(bucket: str, key: str, etag: str) -> str:
@@ -43,11 +44,13 @@ def _get_object_metadata(bucket: str, key: str) -> dict:
         head = s3.head_object(Bucket=bucket, Key=key)
         return {
             "size_bytes": head["ContentLength"],
-            "etag":       head["ETag"].strip('"'),
+            "etag": head["ETag"].strip('"'),
             "last_modified": head["LastModified"].isoformat(),
         }
     except Exception as exc:
-        logger.warning("Could not fetch object metadata for s3://%s/%s: %s", bucket, key, exc)
+        logger.warning(
+            "Could not fetch object metadata for s3://%s/%s: %s", bucket, key, exc
+        )
         return {}
 
 
@@ -63,7 +66,7 @@ def handler(event, context):
 
     for record in event.get("Records", []):
         bucket = record["s3"]["bucket"]["name"]
-        key    = unquote_plus(record["s3"]["object"]["key"])
+        key = unquote_plus(record["s3"]["object"]["key"])
 
         # Only process freight CSV files in the expected prefix
         if not key.startswith("freight/") or not key.endswith(".csv"):
@@ -73,14 +76,16 @@ def handler(event, context):
         metadata = _get_object_metadata(bucket, key)
         etag = metadata.get("etag", context.aws_request_id[:20])
 
-        execution_input = json.dumps({
-            "bucket":        bucket,
-            "key":           key,
-            "etag":          etag,
-            "size_bytes":    metadata.get("size_bytes", 0),
-            "triggered_at":  datetime.now(timezone.utc).isoformat(),
-            "environment":   ENVIRONMENT,
-        })
+        execution_input = json.dumps(
+            {
+                "bucket": bucket,
+                "key": key,
+                "etag": etag,
+                "size_bytes": metadata.get("size_bytes", 0),
+                "triggered_at": datetime.now(timezone.utc).isoformat(),
+                "environment": ENVIRONMENT,
+            }
+        )
 
         execution_name = _build_execution_name(bucket, key, etag)
 
@@ -93,18 +98,25 @@ def handler(event, context):
             executions_started += 1
             logger.info(
                 "Started execution %s for s3://%s/%s → ARN: %s",
-                execution_name, bucket, key, resp["executionArn"]
+                execution_name,
+                bucket,
+                key,
+                resp["executionArn"],
             )
         except sfn.exceptions.ExecutionAlreadyExists:
             # Idempotent — same ETag = same execution name = already running
             logger.info("Execution already exists for etag %s — skipping", etag)
         except Exception as exc:
-            logger.error("Failed to start execution for s3://%s/%s: %s", bucket, key, exc)
+            logger.error(
+                "Failed to start execution for s3://%s/%s: %s", bucket, key, exc
+            )
             errors.append({"key": key, "error": str(exc)})
 
     if errors:
         # Raise so Lambda retries and DLQ captures persistent failures
-        raise RuntimeError(f"Failed to trigger pipeline for {len(errors)} file(s): {errors}")
+        raise RuntimeError(
+            f"Failed to trigger pipeline for {len(errors)} file(s): {errors}"
+        )
 
     return {
         "statusCode": 200,
